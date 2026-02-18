@@ -142,7 +142,7 @@ export function getJournalEntryById(
  * @param dbFile The file path pointing to the DB file
  * @returns JournalEntry[]
  */
-export function getAllJournalEntriesByUserId(userId: number, dbFile: PathLike) {
+export function getAllJournalEntriesByUserId(userId: number, dbFile: PathLike): JournalEntry[] {
   const journalEntries: JournalEntry[] = [];
   try {
     const db = new DatabaseSync(dbFile);

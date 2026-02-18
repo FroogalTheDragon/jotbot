@@ -1,7 +1,7 @@
-/assets/selfies/*
-/assets/archive/selfies/*
-/assets/journal_entry_images/*
-/assets/custom_404/*
+/assets/custom_404
+/assets/journal_entry_images
+/assets/selfies
+/assets/voice_recordings
 /bin
 *.db
 .env

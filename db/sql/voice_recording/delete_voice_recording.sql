@@ -1,0 +1,1 @@
+DELETE FROM voice_recording_db WHERE id = <ID>;

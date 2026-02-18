@@ -1,0 +1,1 @@
+INSERT INTO voice_recording_db (entryId, path, length) VALUES (?, ?, ?);

@@ -1,6 +1,6 @@
 import { Conversation } from "@grammyjs/conversations";
 import { Context, InlineKeyboard } from "grammy";
-import { JournalEntry } from "../types/types.ts";
+import { JournalEntry, VoiceRecording } from "../types/types.ts";
 import {
   getAllJournalEntriesByUserId,
   insertJournalEntry,
@@ -8,6 +8,8 @@ import {
 import { dbFile } from "../constants/paths.ts";
 import { downloadTelegramImage } from "../utils/misc.ts";
 import { insertJournalEntryPhoto } from "../models/journal_entry_photo.ts";
+import { insertVoiceRecording } from "../models/voice_recording.ts";
+import { getTelegramDownloadUrl } from "../utils/telegram.ts";
 
 /**
  * Starts the process of creating a new journal entry.
@@ -83,5 +85,100 @@ export async function new_journal_entry(
       );
     }
   }
+
+  // Ask user if they want to add a voice recording
+  const askVoiceMsg = await ctx.reply(
+    "Would you like to add a voice recording?",
+    {
+      reply_markup: new InlineKeyboard().text("🎙️ Yes", "voice-yes").text(
+        "⛔ No",
+        "voice-no",
+      ),
+    },
+  );
+
+  const voiceChoiceCtx = await conversation.waitForCallbackQuery([
+    "voice-yes",
+    "voice-no",
+  ]);
+
+  if (voiceChoiceCtx.callbackQuery.data === "voice-yes") {
+    let voiceCount = 0;
+    while (true) {
+      await ctx.api.editMessageText(
+        ctx.chatId!,
+        askVoiceMsg.message_id,
+        `Send me a voice recording or click done.  You have sent ${voiceCount} recording(s).`,
+      );
+      await ctx.api.editMessageReplyMarkup(ctx.chatId!, askVoiceMsg.message_id, {
+        reply_markup: new InlineKeyboard().text("Done", "voice-done"),
+      });
+
+      const voiceCtx = await conversation.waitFor([
+        "message:voice",
+        "callback_query",
+      ]);
+
+      if (voiceCtx.callbackQuery?.data === "voice-done") {
+        break;
+      }
+
+      try {
+        const file = await voiceCtx.getFile();
+        const journalEntryId = await conversation.external(() =>
+          getAllJournalEntriesByUserId(ctx.from?.id!, dbFile)[0].id!
+        );
+
+        // Download voice file from Telegram
+        const voiceResponse = await fetch(
+          getTelegramDownloadUrl().replace("<token>", ctx.api.token).replace(
+            "<file_path>",
+            file.file_path!,
+          ),
+        );
+
+        if (voiceResponse.body) {
+          const voiceRecording: VoiceRecording = await conversation.external(
+            async () => {
+              const fileName = `${journalEntryId}_${
+                new Date(Date.now()).toLocaleString()
+              }.ogg`.replaceAll(" ", "_").replace(",", "").replaceAll(
+                "/",
+                "-",
+              );
+
+              const filePath =
+                `${Deno.cwd()}/assets/voice_recordings/${fileName}`;
+              const outFile = await Deno.open(filePath, {
+                write: true,
+                create: true,
+              });
+
+              const realPath = await Deno.realPath(filePath);
+              await voiceResponse.body!.pipeTo(outFile.writable);
+
+              return {
+                entryId: journalEntryId,
+                path: realPath,
+                length: voiceCtx.message?.voice?.duration || 0,
+              };
+            },
+          );
+
+          await conversation.external(() =>
+            insertVoiceRecording(voiceRecording, dbFile)
+          );
+          await ctx.reply(`Saved voice recording!`);
+          voiceCount++;
+        }
+      } catch (err) {
+        console.error(
+          `Failed to save voice recording for Journal Entry: ${err}`,
+        );
+        await ctx.reply(`Failed to save voice recording: ${err}`);
+      }
+    }
+  }
+
   return await ctx.reply("Journaling Done!");
 }

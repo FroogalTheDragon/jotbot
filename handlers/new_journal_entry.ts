@@ -110,9 +110,13 @@ export async function new_journal_entry(
         askVoiceMsg.message_id,
         `Send me a voice recording or click done.  You have sent ${voiceCount} recording(s).`,
       );
-      await ctx.api.editMessageReplyMarkup(ctx.chatId!, askVoiceMsg.message_id, {
-        reply_markup: new InlineKeyboard().text("Done", "voice-done"),
-      });
+      await ctx.api.editMessageReplyMarkup(
+        ctx.chatId!,
+        askVoiceMsg.message_id,
+        {
+          reply_markup: new InlineKeyboard().text("Done", "voice-done"),
+        },
+      );
 
       const voiceCtx = await conversation.waitFor([
         "message:voice",

@@ -55,8 +55,6 @@ export function entryFromString(entryString: string): Entry {
   }
 }
 
-
-
 export function entryToString(entry: Entry): string {
   let lastEditedString: string = "";
   if (entry.lastEditedTimestamp !== undefined) {
@@ -217,10 +215,10 @@ export async function downloadTelegramImage(
   token: string,
   caption: string,
   telegramFile: File,
-  journalEntryId: number,
+  entryId: number,
 ): Promise<JournalEntryPhoto> {
   const journalEntryPhoto: JournalEntryPhoto = {
-    journalEntryId: journalEntryId,
+    entryId: entryId,
     path: "",
     caption: "",
     fileSize: 0,
@@ -237,7 +235,7 @@ export async function downloadTelegramImage(
     journalEntryPhoto.caption = caption;
 
     if (selfieResponse.body) {
-      const fileName = `${journalEntryId}_${
+      const fileName = `${entryId}_${
         new Date(Date.now()).toLocaleString()
       }.jpg`.replaceAll(" ", "_").replace(",", "").replaceAll("/", "-"); // Build and sanitize selfie file name
 
@@ -257,4 +255,13 @@ export async function downloadTelegramImage(
     throw err;
   }
   return journalEntryPhoto;
+}
+
+/**
+ * A simpler console.log
+ * @param message
+ */
+// deno-lint-ignore no-explicit-any
+export function print(message: any) {
+  console.log(message);
 }

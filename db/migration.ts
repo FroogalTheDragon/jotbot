@@ -106,7 +106,7 @@ export function createJournalEntryPhotosTable(dbFile: PathLike) {
     db.prepare(query).run();
     db.close();
   } catch (err) {
-    console.error(`Failed to create settings table: ${err}`);
+    console.error(`Failed to create photo_db table: ${err}`);
   }
 }
 

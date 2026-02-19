@@ -21,7 +21,7 @@ export function insertJournalEntryPhoto(
     const queryResult = db.prepare(
       `INSERT INTO photo_db (entryId, path, caption, fileSize) VALUES (?, ?, ?, ?);`,
     ).run(
-      jePhoto.journalEntryId,
+      jePhoto.entryId,
       jePhoto.path,
       jePhoto.caption || null,
       jePhoto.fileSize,
@@ -100,11 +100,11 @@ export function deleteJournalEntryPhoto(id: number, dbFile: PathLike) {
 }
 
 /**
- * @param journalEntryId Journal entry the photos are linked to
+ * @param entryId Journal entry the photos are linked to
  * @param dbFile Path to database file
  */
 export function getJournalEntryPhotosByJournalEntryId(
-  journalEntryId: number,
+  entryId: number,
   dbFile: PathLike,
 ): JournalEntryPhoto[] {
   try {
@@ -114,12 +114,25 @@ export function getJournalEntryPhotosByJournalEntryId(
     ) throw new Error("JotBot Error: Databaes integrety check failed!");
     db.exec("PRAGMA foreign_keys = ON;");
 
-    const queryResult = db.prepare(
-      `SELECT * FROM photo_db WHERE entryId = ${journalEntryId};`,
-    ).get();
+    const queryResults = db.prepare(
+      `SELECT * FROM photo_db WHERE entryId = ${entryId};`,
+    ).all();
 
     db.close();
-    return queryResult;
+    const photos: JournalEntryPhoto[] = [];
+    for (const result in queryResults) {
+      if (queryResults[result] != null) {
+        const photo: JournalEntryPhoto = {
+          id: Number(queryResults[result].id),
+          entryId: Number(queryResults[result].entryId),
+          path: queryResults[result].path?.toString()!,
+          caption: queryResults[result].caption?.toString() || undefined,
+          fileSize: Number(queryResults[result].fileSize),
+        };
+        photos.push(photo);
+      }
+    }
+    return photos;
   } catch (err) {
     console.error(
       `Failed to insert journal entry photo into photo_db: ${err}`,
@@ -149,7 +162,7 @@ export function getJournalEntryPhotoById(
     ).get();
 
     db.close();
-    return queryResult;
+    return queryResult as JournalEntryPhoto;
   } catch (err) {
     console.error(
       `Failed to insert journal entry photo into photo_db: ${err}`,

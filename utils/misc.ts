@@ -235,9 +235,8 @@ export async function downloadTelegramImage(
     journalEntryPhoto.caption = caption;
 
     if (selfieResponse.body) {
-      const fileName = `${entryId}_${
-        new Date(Date.now()).toLocaleString()
-      }.jpg`.replaceAll(" ", "_").replace(",", "").replaceAll("/", "-"); // Build and sanitize selfie file name
+      const fileName = `${entryId}_${new Date(Date.now()).toLocaleString()}.jpg`
+        .replaceAll(" ", "_").replace(",", "").replaceAll("/", "-"); // Build and sanitize selfie file name
 
       const filePath = `${Deno.cwd()}/assets/journal_entry_images/${fileName}`;
       const file = await Deno.open(filePath, {

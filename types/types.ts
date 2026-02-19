@@ -73,17 +73,15 @@ export type Settings = {
 
 export type JournalEntryPhoto = {
   id?: number;
-  journalEntryId: number;
+  entryId: number;
   path: string;
-  caption?: string | null;
+  caption?: string;
   fileSize: number;
 };
 
 export type JournalEntry = {
   id?: number;
   userId: number;
-  imagesId?: number | null;
-  voiceRecordingsId?: number | null;
   timestamp: number;
   lastEditedTimestamp?: number | null;
   content: string;

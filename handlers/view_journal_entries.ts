@@ -1,6 +1,6 @@
-import { Context, InlineKeyboard } from "grammy";
+import { Context, InlineKeyboard, InputMediaBuilder } from "grammy";
 import { Conversation } from "@grammyjs/conversations";
-import { JournalEntry } from "../types/types.ts";
+import { JournalEntry, JournalEntryPhoto } from "../types/types.ts";
 import { dbFile } from "../constants/paths.ts";
 import {
   deleteJournalEntryById,
@@ -10,6 +10,7 @@ import {
 import { getJournalEntryPhotosByJournalEntryId } from "../models/journal_entry_photo.ts";
 import { getAllVoiceRecordingsByEntryId } from "../models/voice_recording.ts";
 import { InputFile } from "grammy/types";
+import { print } from "../utils/misc.ts";
 
 const viewJournalEntriesKeyboard: InlineKeyboard = new InlineKeyboard()
   .text("⬅️", "prev-journal")
@@ -30,7 +31,9 @@ function buildJournalEntryString(
 ): string {
   const dateCreated = new Date(entry.timestamp!).toLocaleString();
   const lastEdited = entry.lastEditedTimestamp
-    ? `\n<b>Last Edited</b> ${new Date(entry.lastEditedTimestamp).toLocaleString()}`
+    ? `\n<b>Last Edited</b> ${
+      new Date(entry.lastEditedTimestamp).toLocaleString()
+    }`
     : "";
 
   return `📖 <b>Journal Entry</b>
@@ -44,8 +47,8 @@ Page <b>${currentIndex + 1}</b> of <b>${total}</b>`;
 
 /**
  * A conversation to view current journal entries
- * @param conversation 
- * @param ctx 
+ * @param conversation
+ * @param ctx
  * @returns null
  */
 export async function view_journal_entries(
@@ -57,11 +60,18 @@ export async function view_journal_entries(
   );
 
   if (journalEntries.length === 0) {
-    return await ctx.api.sendMessage(ctx.chatId!, "No journal entries to view.");
+    return await ctx.api.sendMessage(
+      ctx.chatId!,
+      "No journal entries to view.",
+    );
   }
 
   let currentEntry = 0;
 
+  // const journalEnryPhotoMsg = await ctx.api.sendMessage(
+  //   ctx.chatId!,
+
+  // )
   const displayEntryMsg = await ctx.api.sendMessage(
     ctx.chatId!,
     buildJournalEntryString(
@@ -115,11 +125,11 @@ export async function view_journal_entries(
       case "view-photos": {
         try {
           const entryId = journalEntries[currentEntry].id!;
-          const photos = await conversation.external(() =>
+          const photos: JournalEntryPhoto[] = await conversation.external(() =>
             getJournalEntryPhotosByJournalEntryId(entryId, dbFile)
           );
-
-          if (!photos || (Array.isArray(photos) && photos.length === 0)) {
+          print(photos);
+          if (!photos || photos.length === 0) {
             await viewCtx.answerCallbackQuery({
               text: "No photos for this entry.",
               show_alert: true,
@@ -127,27 +137,100 @@ export async function view_journal_entries(
             break;
           }
 
-          // Normalize to array (the existing function may return a single object due to .get())
-          const photoArray = Array.isArray(photos) ? photos : [photos];
+          // Track sent photo message IDs so we can clean them up on dismiss
+          const photoMsgIds: number[] = [];
 
-          for (const photo of photoArray) {
+          if (photos.length === 1) {
+            // Single photo — send with sendPhoto
+            const caption = photos[0].caption
+              ? `📷 ${photos[0].caption}\n\nPhoto <b>1</b> of <b>1</b>`
+              : `📷 Photo <b>1</b> of <b>1</b>`;
             try {
-              await ctx.api.sendPhoto(
+              const msg = await ctx.api.sendPhoto(
                 ctx.chatId!,
-                new InputFile(photo.path || photo.path),
-                {
-                  caption: photo.caption
-                    ? `📷 ${photo.caption}`
-                    : "📷 Journal photo",
-                },
+                new InputFile(photos[0].path),
+                { caption, parse_mode: "HTML" },
               );
+              photoMsgIds.push(msg.message_id);
             } catch (photoErr) {
               console.error(`Failed to send photo: ${photoErr}`);
               await ctx.api.sendMessage(
                 ctx.chatId!,
-                `⚠️ Could not load photo: ${photo.path}`,
+                `⚠️ Could not load photo: ${photos[0].path}`,
               );
             }
+          } else {
+            // Multiple photos — send as a media group (album)
+            const mediaGroup = photos.map((photo, index) => {
+              const caption = photo.caption
+                ? `📷 ${photo.caption} (${index + 1}/${photos.length})`
+                : `📷 Photo ${index + 1} of ${photos.length}`;
+              return InputMediaBuilder.photo(
+                new InputFile(photo.path),
+                { caption, parse_mode: "HTML" },
+              );
+            });
+
+            try {
+              const msgs = await ctx.api.sendMediaGroup(
+                ctx.chatId!,
+                mediaGroup,
+              );
+              for (const msg of msgs) {
+                photoMsgIds.push(msg.message_id);
+              }
+            } catch (albumErr) {
+              console.error(`Failed to send photo album: ${albumErr}`);
+              // Fallback: send photos individually
+              for (const photo of photos) {
+                try {
+                  const msg = await ctx.api.sendPhoto(
+                    ctx.chatId!,
+                    new InputFile(photo.path),
+                    {
+                      caption: photo.caption
+                        ? `📷 ${photo.caption}`
+                        : "📷 Journal photo",
+                    },
+                  );
+                  photoMsgIds.push(msg.message_id);
+                } catch (photoErr) {
+                  console.error(`Failed to send photo: ${photoErr}`);
+                  await ctx.api.sendMessage(
+                    ctx.chatId!,
+                    `⚠️ Could not load photo: ${photo.path}`,
+                  );
+                }
+              }
+            }
+          }
+
+          // Send a dismiss button so user can clean up the photos
+          const dismissMsg = await ctx.api.sendMessage(
+            ctx.chatId!,
+            `🖼️ <b>${photos.length}</b> photo${
+              photos.length > 1 ? "s" : ""
+            } for this journal entry.`,
+            {
+              parse_mode: "HTML",
+              reply_markup: new InlineKeyboard().text(
+                "✖️ Dismiss Photos",
+                "dismiss-photos",
+              ),
+            },
+          );
+
+          // Wait for dismiss
+          const dismissCtx = await conversation.waitForCallbackQuery([
+            "dismiss-photos",
+          ]);
+          try {
+            await dismissCtx.api.deleteMessages(ctx.chatId!, [
+              ...photoMsgIds,
+              dismissMsg.message_id,
+            ]);
+          } catch (_err) {
+            // Ignore if messages were already deleted
           }
         } catch (err) {
           console.error(`Failed to retrieve photos: ${err}`);
@@ -179,7 +262,9 @@ export async function view_journal_entries(
                 ctx.chatId!,
                 new InputFile(voiceRecordings[i].path),
                 {
-                  caption: `🎙️ Voice recording ${i + 1} of ${voiceRecordings.length}`,
+                  caption: `🎙️ Voice recording ${
+                    i + 1
+                  } of ${voiceRecordings.length}`,
                   duration: voiceRecordings[i].length || undefined,
                 },
               );
@@ -265,7 +350,11 @@ export async function view_journal_entries(
             const photos = await conversation.external(() =>
               getJournalEntryPhotosByJournalEntryId(entryId, dbFile)
             );
-            const photoArray = Array.isArray(photos) ? photos : photos ? [photos] : [];
+            const photoArray = Array.isArray(photos)
+              ? photos
+              : photos
+              ? [photos]
+              : [];
             for (const photo of photoArray) {
               try {
                 await conversation.external(async () => {

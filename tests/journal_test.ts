@@ -12,6 +12,7 @@ import { insertUser } from "../models/user.ts";
 import { JournalEntry, User } from "../types/types.ts";
 import { assertObjectMatch } from "@std/assert/object-match";
 import { existsSync } from "node:fs";
+import { print } from "../utils/misc.ts";
 
 // Create test db directory structure
 if (!existsSync(testDbFileBasePath)) {
@@ -22,8 +23,6 @@ if (!existsSync(testDbFileBasePath)) {
 const testJournalEntry: JournalEntry = {
   id: 1,
   userId: 12345,
-  imagesId: null,
-  voiceRecordingsId: null,
   timestamp: 1234567890,
   lastEditedTimestamp: null,
   content: "Test journal entry.",
@@ -58,6 +57,7 @@ Deno.test("Test getJournalEntryById()", () => {
   insertJournalEntry(testJournalEntry, testDbFile);
 
   const entry = getJournalEntryById(1, testDbFile);
+  print(entry);
   assertObjectMatch(entry!, testJournalEntry);
   Deno.removeSync(testDbFile);
 });

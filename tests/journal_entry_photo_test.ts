@@ -7,6 +7,8 @@ import {
 } from "../db/migration.ts";
 import { insertJournalEntry } from "../models/journal.ts";
 import {
+  getJournalEntryPhotoById,
+  getJournalEntryPhotosByJournalEntryId,
   insertJournalEntryPhoto,
   updateJournalEntryPhoto,
 } from "../models/journal_entry_photo.ts";
@@ -36,8 +38,17 @@ const testJournalEntry: JournalEntry = {
 
 const testJournalEntryPhoto: JournalEntryPhoto = {
   id: 1,
-  journalEntryId: 1,
+  entryId: 1,
   path: "/some/test/path.jpg",
+  caption: "Test Caption",
+  fileSize: 1024,
+};
+
+// Need to insert multiple photos for getJournalEntryPhotosByJournalEntryId
+const testJournalEntryPhoto2: JournalEntryPhoto = {
+  id: 2,
+  entryId: 1,
+  path: "/some/test/path2.jpg",
   caption: "Test Caption",
   fileSize: 1024,
 };
@@ -84,9 +95,68 @@ Deno.test("Test deleteJournalEntryPhoto", () => {
 
 Deno.test("Test getJournalEntryPhotosByJournalEntryId", () => {
   // TODO: Write proper test for photos(s) retrieval from the journal by entry id(may be multiple)
+  createUserTable(testDbFile);
+  createJournalTable(testDbFile);
+  createJournalEntryPhotosTable(testDbFile);
+  insertUser(testUser, testDbFile);
+  insertJournalEntry(testJournalEntry, testDbFile);
+
+  // Insert one photo
+  insertJournalEntryPhoto(
+    testJournalEntryPhoto,
+    testDbFile,
+  );
+
+  // Insert a second photo
+  insertJournalEntryPhoto(
+    testJournalEntryPhoto2,
+    testDbFile,
+  );
+
+  const testPhotos: JournalEntryPhoto[] = [
+    testJournalEntryPhoto,
+    testJournalEntryPhoto2,
+  ];
+
+  const photos: JournalEntryPhoto[] = getJournalEntryPhotosByJournalEntryId(
+    1,
+    testDbFile,
+  );
+  assertEquals(
+    photos,
+    testPhotos,
+    "Something went wrong when comparing two JournalEntryPhoto[]",
+  );
+  Deno.removeSync(testDbFile);
 });
 
 Deno.test("Test getJournalEntryPhotoById", () => {
-  // TODO: Write proper test for photo retrieval by entry id(one photo per entry?)
-  // NOTE: @NiXTheDev: isn't the above test a duplicate?
+  createUserTable(testDbFile);
+  createJournalTable(testDbFile);
+  createJournalEntryPhotosTable(testDbFile);
+  insertUser(testUser, testDbFile);
+  insertJournalEntry(testJournalEntry, testDbFile);
+
+  // Insert two photos so we can verify we get the right one
+  insertJournalEntryPhoto(testJournalEntryPhoto, testDbFile);
+  insertJournalEntryPhoto(testJournalEntryPhoto2, testDbFile);
+
+  const photo = getJournalEntryPhotoById(1, testDbFile);
+
+  // node:sqlite returns numbers as bigints, so compare field by field
+  assertEquals(Number(photo.id), testJournalEntryPhoto.id);
+  assertEquals(
+    Number(photo.entryId),
+    testJournalEntryPhoto.entryId,
+  );
+  assertEquals(photo.path, testJournalEntryPhoto.path);
+  assertEquals(photo.caption, testJournalEntryPhoto.caption);
+  assertEquals(Number(photo.fileSize), testJournalEntryPhoto.fileSize);
+
+  // Verify retrieving the second photo returns different data
+  const photo2 = getJournalEntryPhotoById(2, testDbFile);
+  assertEquals(Number(photo2.id), testJournalEntryPhoto2.id);
+  assertEquals(photo2.path, testJournalEntryPhoto2.path);
+
+  Deno.removeSync(testDbFile);
 });

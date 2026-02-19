@@ -124,8 +124,6 @@ export function getJournalEntryById(
     return {
       id: Number(journalEntry?.id!),
       userId: Number(journalEntry?.userId!),
-      imagesId: Number(journalEntry?.imagesId!) || null,
-      voiceRecordingsId: Number(journalEntry?.voiceRecordingsId) || null,
       timestamp: Number(journalEntry?.timestamp!),
       lastEditedTimestamp: Number(journalEntry?.lastEditedTimestamp) || null,
       content: String(journalEntry?.content!),
@@ -142,7 +140,10 @@ export function getJournalEntryById(
  * @param dbFile The file path pointing to the DB file
  * @returns JournalEntry[]
  */
-export function getAllJournalEntriesByUserId(userId: number, dbFile: PathLike): JournalEntry[] {
+export function getAllJournalEntriesByUserId(
+  userId: number,
+  dbFile: PathLike,
+): JournalEntry[] {
   const journalEntries: JournalEntry[] = [];
   try {
     const db = new DatabaseSync(dbFile);
@@ -163,10 +164,6 @@ export function getAllJournalEntriesByUserId(userId: number, dbFile: PathLike): 
           Number(journalEntriesResults[je]?.lastEditedTimestamp) || null,
         content: String(journalEntriesResults[je]?.content!),
         length: Number(journalEntriesResults[je]?.length!),
-        imagesId: Number(journalEntriesResults[je]?.imagesId) || null,
-        voiceRecordingsId:
-          Number(journalEntriesResults[je]?.voiceRecordingsId!) ||
-          null,
       };
       journalEntries.push(journalEntry);
     }

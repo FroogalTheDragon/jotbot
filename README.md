@@ -264,3 +264,5 @@ jotbot/
 ## License
 
 This project is licensed under the [GNU General Public License v3.0](LICENSE).
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/I3I01URQ8H)
